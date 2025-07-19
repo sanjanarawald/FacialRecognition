@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition App</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        .startup-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #fff;
+            font-size: 1.2em;
+        }
+        .camera-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .button i {
+            margin-right: 5px;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 480px;
+            margin: 0 auto 20px;
+            border: 2px solid #ddd;
+            background-color: #000;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        #video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror the video */
+            z-index: 1;
+        }
+        
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2; /* Canvas above video */
+            background: transparent; /* Make canvas transparent to show video */
+            transform: scaleX(-1); /* Mirror the canvas to match video */
+        }
+        #video, #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background-color: #000;
+        }
+        .controls {
+            max-width: 500px;
+            margin: 0 auto 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            border: 1px solid #eee;
+        }
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        .button.secondary {
+            background-color: #f44336;
+        }
+        .button.secondary:hover {
+            background-color: #d32f2f;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .status.error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .known-faces {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            border: 1px solid #eee;
+        }
+        .known-faces h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .faces-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .face-card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+            text-align: center;
+        }
+        .face-card img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+        }
+        .face-card p {
+            margin: 5px 0;
+            padding: 5px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Face Recognition System</h1>
+        
+        <div class="video-container">
+            <video id="video" width="640" height="480" autoplay playsinline style="display: none;"></video>
+            <canvas id="canvas" width="640" height="480" style="display: none;"></canvas>
+            <div id="startupMessage" class="startup-message">
+                <p>Click 'Start Camera' to begin face recognition</p>
+            </div>
+        </div>
+        
+        <div class="camera-controls">
+            <button id="startCamera" class="button">
+                <i class="fas fa-camera"></i> Start Camera
+            </button>
+            <button id="stopCamera" class="button secondary" style="display: none;">
+                <i class="fas fa-stop"></i> Stop Camera
+            </button>
+        </div>
+        
+        <div class="controls">
+            <h2>Add New Face</h2>
+            <div class="form-group">
+                <label for="name">Person's Name:</label>
+                <input type="text" id="name" placeholder="Enter person's name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="faceImage">Upload Face Image:</label>
+                <input type="file" id="faceImage" accept="image/*" capture="camera" required>
+            </div>
+            
+            <button id="addFaceBtn" class="button">
+                <i class="fas fa-plus"></i> Add New Face
+            </button>
+            
+            <div id="status" class="status"></div>
+        </div>
+        
+        <div class="known-faces">
+            <h2>Known Faces</h2>
+            <div id="facesGrid" class="faces-grid">
+                <!-- Known faces will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // UI Elements
+            const addFaceBtn = document.getElementById('addFaceBtn');
+            const nameInput = document.getElementById('name');
+            const faceImageInput = document.getElementById('faceImage');
+            const statusDiv = document.getElementById('status');
+            const facesGrid = document.getElementById('facesGrid');
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const startCameraBtn = document.getElementById('startCamera');
+            const stopCameraBtn = document.getElementById('stopCamera');
+            const startupMessage = document.getElementById('startupMessage');
+            const ctx = canvas.getContext('2d');
+            
+            let stream = null;
+            let isRecognizing = false;
+            
+            // Load known faces on page load
+            loadKnownFaces();
+            
+            // Start camera button click handler
+            startCameraBtn.addEventListener('click', startCamera);
+            
+            // Stop camera button click handler
+            stopCameraBtn.addEventListener('click', stopCamera);
+            
+            // Add face button click handler
+            addFaceBtn.addEventListener('click', addFace);
+            
+            // Start the camera
+            async function startCamera() {
+                try {
+                    // Request camera access
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            width: 640,
+                            height: 480,
+                            facingMode: 'user' // Front camera
+                        }, 
+                        audio: false 
+                    });
+                    
+                    // Set video source to the camera stream
+                    video.srcObject = stream;
+                    video.style.display = 'block';
+                    
+                    // Make sure canvas is properly sized and visible
+                    canvas.width = video.videoWidth || 640;
+                    canvas.height = video.videoHeight || 480;
+                    canvas.style.display = 'block';
+                    
+                    startupMessage.style.display = 'none';
+                    
+                    // Show stop button and hide start button
+                    startCameraBtn.style.display = 'none';
+                    stopCameraBtn.style.display = 'inline-block';
+                    
+                    // Start face recognition
+                    isRecognizing = true;
+                    recognizeFaces();
+                    
+                    showStatus('Camera started. Looking for faces...', 'success');
+                } catch (err) {
+                    console.error('Error accessing camera:', err);
+                    showStatus('Error accessing camera. Please make sure you have granted camera permissions.', 'error');
+                }
+            }
+            
+            // Stop the camera
+            function stopCamera() {
+                if (stream) {
+                    // Stop all tracks in the stream
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                }
+                
+                // Clear the video and canvas
+                video.srcObject = null;
+                video.style.display = 'none';
+                canvas.style.display = 'none';
+                startupMessage.style.display = 'block';
+                
+                // Show start button and hide stop button
+                startCameraBtn.style.display = 'inline-block';
+                stopCameraBtn.style.display = 'none';
+                
+                // Stop face recognition
+                isRecognizing = false;
+                
+                showStatus('Camera stopped.', 'info');
+            }
+            
+            // Face recognition function
+            async function recognizeFaces() {
+                if (!isRecognizing) return;
+                
+                try {
+                    // Get the current video frame
+                    const imageData = await getVideoFrame();
+                    
+                    // Send to server for recognition
+                    const response = await fetch('/recognize', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'text/plain;charset=UTF-8',
+                        },
+                        body: imageData
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        // Draw the video frame and recognition results
+                        drawVideoFrame();
+                        drawRecognitions(data);
+                    }
+                } catch (error) {
+                    console.error('Recognition error:', error);
+                }
+                
+                // Continue recognition loop
+                if (isRecognizing) {
+                    // Use requestAnimationFrame for smooth animation
+                    requestAnimationFrame(recognizeFaces);
+                }
+            }
+            
+            // Helper function to get video frame as base64
+            function getVideoFrame() {
+                // Create a temporary canvas to get the frame
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = video.videoWidth || 640;
+                tempCanvas.height = video.videoHeight || 480;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+                return tempCanvas.toDataURL('image/jpeg', 0.8);
+            }
+            
+            // Helper function to draw video frame to canvas
+            function drawVideoFrame() {
+                // Clear the canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Save the current context state
+                ctx.save();
+                
+                // Flip the context horizontally to match the mirrored video
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+                
+                // Restore the context state
+                ctx.restore();
+            }
+            
+            // Draw face contour using facial landmarks
+            function drawFaceOutline(face) {
+                if (!face.landmark || !face.landmark.points) {
+                    console.log('No landmarks available for face');
+                    return;
+                }
+
+                // Save context state
+                ctx.save();
+                
+                // Get the face landmarks
+                const points = face.landmark.points;
+                
+                // If points is empty or not in the expected format, use a simple box
+                if (!points || points.length === 0) {
+                    ctx.strokeStyle = 'rgba(0, 255, 200, 0.7)';
+                    ctx.lineWidth = 2;
+                    // Account for mirrored video
+                    const mirroredX = canvas.width - face.x - face.width;
+                    ctx.strokeRect(mirroredX, face.y, face.width, face.height);
+                    ctx.restore();
+                    return;
+                }
+                
+                // Function to get mirrored x coordinate
+                const mirrorX = (x) => canvas.width - x;
+                
+                // Start drawing the face contour
+                ctx.beginPath();
+                
+                // Helper function to draw a mirrored path
+                const drawMirroredPath = (start, end) => {
+                    // Move to the first point (mirrored)
+                    ctx.moveTo(mirrorX(points[start][0]), points[start][1]);
+                    
+                    // Draw line to each subsequent point
+                    for (let i = start + 1; i <= end; i++) {
+                        ctx.lineTo(mirrorX(points[i][0]), points[i][1]);
+                    }
+                    
+                    // Close the path if needed
+                    if (start !== end) {
+                        ctx.lineTo(mirrorX(points[start][0]), points[start][1]);
+                    }
+                };
+                
+                // Draw the jawline (points 0-16)
+                drawMirroredPath(0, 16);
+                
+                // Draw the right eyebrow (points 17-21)
+                drawMirroredPath(17, 21);
+                
+                // Draw the left eyebrow (points 22-26)
+                drawMirroredPath(22, 26);
+                
+                // Draw the nose bridge (points 27-30)
+                drawMirroredPath(27, 30);
+                
+                // Draw the nose bottom (points 31-35)
+                drawMirroredPath(31, 35);
+                
+                // Draw the right eye (points 36-41)
+                drawMirroredPath(36, 41);
+                
+                // Draw the left eye (points 42-47)
+                drawMirroredPath(42, 47);
+                
+                // Draw the outer lips (points 48-59)
+                drawMirroredPath(48, 59);
+                
+                // Draw the inner lips (points 60-67)
+                drawMirroredPath(60, 67);
+                // Close the inner lips (already handled in drawMirroredPath)
+                
+                // Create a subtle gradient for the outline
+                const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+                gradient.addColorStop(0, 'rgba(0, 255, 200, 0.7)');
+                gradient.addColorStop(1, 'rgba(0, 200, 255, 0.7)');
+                
+                // Draw the outline
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                
+                // Add a subtle glow
+                ctx.shadowColor = 'rgba(0, 255, 200, 0.5)';
+                ctx.shadowBlur = 10;
+                ctx.stroke();
+                
+                // Restore context
+                ctx.restore();
+            }
+            
+            // Draw recognition results on canvas
+            function drawRecognitions(results) {
+                const faces = results.faces || [];
+                
+                // Draw each face
+                faces.forEach(face => {
+                    const confidence = face.confidence || 0;
+                    const isRecognized = face.name !== 'Unknown' && confidence > 0.5;
+                    
+                    // Calculate mirrored x-coordinate to match the mirrored video
+                    const faceX = canvas.width - face.x - face.width;
+                    
+                    // Draw face contour using landmarks if available
+                    drawFaceOutline(face);
+                    
+                    // Prepare text (name only, no confidence score)
+                    const displayText = isRecognized ? face.name : 'Unknown';
+                    
+                    // Save the current canvas state
+                    ctx.save();
+                    
+                    // Calculate text width and position
+                    ctx.font = 'bold 16px Arial';
+                    const textWidth = ctx.measureText(displayText).width;
+                    const textHeight = 22;
+                    const padding = 10;
+                    
+                    // Position text above the face, centered horizontally
+                    // Account for mirroring in the x-coordinate
+                    const textX = canvas.width - (faceX + (face.width / 2) + (textWidth / 2));
+                    const textY = Math.max(20, face.y - 25);
+                    
+                    // Mirror the text horizontally
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                    
+                    // Draw text background with subtle gradient
+                    const gradient = ctx.createLinearGradient(0, textY - textHeight, 0, textY + 5);
+                    gradient.addColorStop(0, 'rgba(0, 20, 30, 0.8)');
+                    gradient.addColorStop(1, 'rgba(0, 60, 80, 0.9)');
+                    
+                    // Draw background
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    const radius = 4;
+                    ctx.roundRect(
+                        textX - padding, 
+                        textY - textHeight, 
+                        textWidth + (padding * 2), 
+                        textHeight + 5,
+                        [radius, radius, radius, radius]
+                    );
+                    ctx.fill();
+                    
+                    // Draw text with tech-style color
+                    ctx.fillStyle = isRecognized ? '#00FFC4' : '#FF3D3D';
+                    ctx.textBaseline = 'top';
+                    ctx.textAlign = 'center';
+                    
+                    // Draw text with shadow
+                    ctx.shadowColor = 'rgba(0, 255, 200, 0.5)';
+                    ctx.shadowBlur = 5;
+                    ctx.fillText(displayText, textX + textWidth/2, textY - textHeight + 5);
+                    
+                    // Clear shadow for next operations
+                    ctx.shadowBlur = 0;
+                    
+                    // Restore the canvas state
+                    ctx.restore();
+                    
+                    // Log to console for debugging
+                    console.log(`Face at (${face.x},${face.y}): ${displayText}`);
+                });
+            }
+            
+            // Add a new face to the system
+            async function addFace() {
+                const name = nameInput.value.trim();
+                const file = faceImageInput.files[0];
+                
+                if (!name || !file) {
+                    showStatus('Please enter a name and select an image.', 'error');
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('name', name);
+                formData.append('file', file);
+                
+                try {
+                    const response = await fetch('/add_face', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        showStatus(`Successfully added ${name} to known faces!`, 'success');
+                        nameInput.value = '';
+                        faceImageInput.value = '';
+                        loadKnownFaces();
+                    } else {
+                        showStatus(`Error: ${result.error || 'Failed to add face'}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error adding face:', error);
+                    showStatus('Error adding face. Please try again.', 'error');
+                }
+            }
+            
+            // Load known faces from the server
+            async function loadKnownFaces() {
+                try {
+                    const response = await fetch('/known_faces');
+                    const faces = await response.json();
+                    
+                    // Clear the grid
+                    facesGrid.innerHTML = '';
+                    
+                    if (faces.length === 0) {
+                        facesGrid.innerHTML = '<p>No known faces found. Add some using the form above.</p>';
+                        return;
+                    }
+                    
+                    // Add each face to the grid
+                    faces.forEach(face => {
+                        const faceCard = document.createElement('div');
+                        faceCard.className = 'face-card';
+                        faceCard.innerHTML = `
+                            <img src="/known_faces/${face.filename}" alt="${face.name}">
+                            <p>${face.name}</p>
+                        `;
+                        facesGrid.appendChild(faceCard);
+                    });
+                } catch (error) {
+                    console.error('Error loading known faces:', error);
+                    facesGrid.innerHTML = '<p>Error loading known faces. Please refresh the page.</p>';
+                }
+            }
+            
+            // Show status message
+            function showStatus(message, type = 'info') {
+                statusDiv.textContent = message;
+                statusDiv.className = 'status';
+                
+                if (type === 'success') {
+                    statusDiv.classList.add('success');
+                } else if (type === 'error') {
+                    statusDiv.classList.add('error');
+                } else if (type === 'info') {
+                    statusDiv.style.color = '#31708f';
+                    statusDiv.style.backgroundColor = '#d9edf7';
+                    statusDiv.style.border = '1px solid #bce8f1';
+                }
+                
+                // Auto-hide after 5 seconds
+                if (type !== 'error') {
+                    setTimeout(() => {
+                        statusDiv.textContent = '';
+                        statusDiv.className = 'status';
+                    }, 5000);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
